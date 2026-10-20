@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Little Crafters Workshop - Interactive Booking</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts: Fredoka & Quicksand -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Quicksand:wght@500;600;700&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- QRCode JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        craftYellow: '#FFDE59',
+                        craftPink: '#FF914D',
+                        craftRose: '#FF66C4',
+                        craftPurple: '#8C52FF',
+                        craftBlue: '#5CE1E6',
+                        craftGreen: '#7ED957',
+                        craftBg: '#FFF9F2'
+                    },
+                    fontFamily: {
+                        fredoka: ['Fredoka', 'sans-serif'],
+                        quicksand: ['Quicksand', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: 'Quicksand', sans-serif;
+            background-color: #FFF9F2;
+            background-image: radial-gradient(#8C52FF 0.75px, transparent 0.75px), radial-gradient(#FF66C4 0.75px, #FFF9F2 0.75px);
+            background-size: 30px 30px;
+            background-position: 0 0, 15px 15px;
+        }
+
+        h1, h2, h3, .font-heading {
+            font-family: 'Fredoka', cursive;
+        }
+
+        .craft-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 3px solid #F0E6D8;
+            box-shadow: 0 12px 30px -10px rgba(140, 82, 255, 0.15);
+        }
+
+        .step-pill.active {
+            background-color: #8C52FF;
+            color: white;
+            box-shadow: 0 4px 12px rgba(140, 82, 255, 0.4);
+        }
+
+        .craft-btn {
+            transition: all 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        .craft-btn:hover {
+            transform: translateY(-2px) scale(1.02);
+        }
+
+        .craft-btn:active {
+            transform: translateY(1px) scale(0.98);
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #FFF9F2;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #8C52FF;
+            border-radius: 10px;
+        }
+
+        @keyframes bounce-gentle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+        }
+
+        .bounce-icon {
+            animation: bounce-gentle 2.5s infinite ease-in-out;
+        }
+
+        /* Printable Ticket styles */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            #printableTicket, #printableTicket * {
+                visibility: visible;
+            }
+            #printableTicket {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .no-print {
+                display: none !important;
+            }
+        }
+    </style>
+</head>
+<body class="min-h-screen pb-12 text-gray-800">
+
+    <!-- Header Section -->
+    <header class="relative bg-white border-b-4 border-craftYellow shadow-sm pt-6 pb-6 mb-8">
+        <div class="max-w-5xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3 text-center sm:text-left">
+                <div class="w-14 h-14 bg-craftYellow rounded-2xl flex items-center justify-center text-craftPurple text-3xl shadow-inner transform -rotate-3">
+                    <i class="fa-solid fa-scissors bounce-icon"></i>
+                </div>
+                <div>
+                    <h1 class="text-3xl sm:text-4xl font-bold text-craftPurple tracking-wide">Little Crafters <span class="text-craftRose">Workshop</span></h1>
+                    <p class="text-sm font-semibold text-gray-500">Sparking creativity for young minds & hands!</p>
+                </div>
+            </div>
+
+            <!-- Header Quick Action Buttons -->
+            <div class="flex items-center gap-2">
+                <button onclick="toggleMyBookingsModal()" class="bg-craftBlue/20 hover:bg-craftBlue/30 text-teal-800 px-4 py-2 rounded-xl font-bold text-sm flex items-center gap-2 border-2 border-craftBlue transition-colors">
+                    <i class="fa-solid fa-ticket text-teal-600"></i> My Bookings <span id="bookingCountBadge" class="bg-craftPurple text-white text-xs px-2 py-0.5 rounded-full">0</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4">
+
+        <!-- Informational Banner -->
+        <div class="bg-gradient-to-r from-purple-600 via-pink-500 to-amber-400 rounded-3xl p-1 p-0.5 shadow-lg mb-8">
+            <div class="bg-white rounded-[22px] p-5 md:p-6">
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div class="p-2 rounded-2xl bg-purple-50 border border-purple-100 flex flex-col items-center">
+                        <i class="fa-regular fa-clock text-2xl text-craftPurple mb-1"></i>
+                        <span class="text-xs text-gray-500 font-bold uppercase tracking-wider">Duration</span>
+                        <span class="font-bold text-gray-800 text-sm md:text-base">1-Hour Sessions</span>
+                    </div>
+                    <div class="p-2 rounded-2xl bg-pink-50 border border-pink-100 flex flex-col items-center">
+                        <i class="fa-solid fa-child text-2xl text-craftRose mb-1"></i>
+                        <span class="text-xs text-gray-500 font-bold uppercase tracking-wider">Target Age</span>
+                        <span class="font-bold text-gray-800 text-sm md:text-base">Ages 5 – 10 Years</span>
+                    </div>
+                    <div class="p-2 rounded-2xl bg-teal-50 border border-teal-100 flex flex-col items-center">
+                        <i class="fa-solid fa-shield-halved text-2xl text-craftBlue mb-1"></i>
+                        <span class="text-xs text-gray-500 font-bold uppercase tracking-wider">Safety</span>
+                        <span class="font-bold text-gray-800 text-sm md:text-base">DBS Staffed & Safe</span>
+                    </div>
+                    <div class="p-2 rounded-2xl bg-amber-50 border border-amber-100 flex flex-col items-center">
+                        <i class="fa-solid fa-paint-brush text-2xl text-amber-500 mb-1"></i>
+                        <span class="text-xs text-gray-500 font-bold uppercase tracking-wider">Supplies</span>
+                        <span class="font-bold text-gray-800 text-sm md:text-base">All Materials Included</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wizard Card -->
+        <div class="craft-card rounded-3xl p-6 md:p-8 mb-8 relative">
+            
+            <!-- Step Navigation Progress Header -->
+            <div class="mb-8">
+                <div class="flex justify-between items-center mb-4 overflow-x-auto pb-2 gap-2 no-scrollbar">
+                    <div class="step-pill active px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap cursor-pointer" onclick="goToStep(1)">
+                        <span class="w-6 h-6 rounded-full bg-white/20 flex items-center justify-center text-xs">1</span> Guardian
+                    </div>
+                    <div class="text-gray-300"><i class="fa-solid fa-chevron-right text-xs"></i></div>
+                    <div class="step-pill px-4 py-2 bg-gray-100 text-gray-500 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap cursor-pointer" onclick="goToStep(2)">
+                        <span class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs">2</span> Children
+                    </div>
+                    <div class="text-gray-300"><i class="fa-solid fa-chevron-right text-xs"></i></div>
+                    <div class="step-pill px-4 py-2 bg-gray-100 text-gray-500 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap cursor-pointer" onclick="goToStep(3)">
+                        <span class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs">3</span> Craft Session
+                    </div>
+                    <div class="text-gray-300"><i class="fa-solid fa-chevron-right text-xs"></i></div>
+                    <div class="step-pill px-4 py-2 bg-gray-100 text-gray-500 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap cursor-pointer" onclick="goToStep(4)">
+                        <span class="w-6 h-6 rounded-full bg-gray-200 flex items-center justify-center text-xs">4</span> Safety & Review
+                    </div>
+                </div>
+                <!-- Progress Bar -->
+                <div class="w-full bg-gray-200 h-2.5 rounded-full overflow-hidden">
+                    <div id="progressBar" class="bg-gradient-to-r from-craftPurple via-craftRose to-craftBlue h-full w-1/4 transition-all duration-300"></div>
+                </div>
+            </div>
+
+            <!-- FORM START -->
+            <form id="bookingForm" onsubmit="event.preventDefault();">
+
+                <!-- STEP 1: Parent / Guardian Details -->
+                <div id="step1" class="step-content space-y-5">
+                    <div class="border-b border-gray-100 pb-3">
+                        <h2 class="text-2xl font-bold text-craftPurple flex items-center gap-2">
+                            <i class="fa-solid fa-user-shield text-craftPink"></i> Parent / Guardian Details
+                        </h2>
+                        <p class="text-sm text-gray-500">Please provide contact details for the primary adult responsible.</p>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Full Name *</label>
+                            <input type="text" id="parentName" required placeholder="e.g. Sarah Jenkins" class="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-craftPurple focus:outline-none transition-all">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Relationship to Child *</label>
+                            <select id="parentRelation" required class="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-craftPurple focus:outline-none transition-all bg-white">
+                                <option value="Parent">Parent</option>
+                                <option value="Guardian">Legal Guardian</option>
+                                <option value="Grandparent">Grandparent</option>
+                                <option value="Relative">Other Relative</option>
+                                <option value="Childminder">Childminder / Au Pair</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Email Address *</label>
+                            <input type="email" id="parentEmail" required placeholder="sarah@example.com" class="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-craftPurple focus:outline-none transition-all">
+                        </div>
+
+                        <div>
+                            <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Phone Number *</label>
+                            <input type="tel" id="parentPhone" required placeholder="07123 456789" class="w-full px-4 py-3 rounded-2xl border-2 border-gray-200 focus:border-craftPurple focus:outline-none transition-all">
+                        </div>
+                    </div>
+
+                    <div class="bg-amber-50 p-4 rounded-2xl border-2 border-amber-200/60 mt-4">
+                        <label class="block text-xs font-bold text-amber-800 uppercase mb-1 flex items-center gap-1.5">
+                            <i class="fa-solid fa-phone-volume text-amber-600"></i> Emergency Contact (Different from above) *
+                        </label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-2">
+                            <input type="text" id="emergencyName" required placeholder="Contact Name" class="px-4 py-2.5 rounded-xl border border-amber-200 focus:outline-none focus:border-amber-500 bg-white text-sm">
+                            <input type="tel" id="emergencyPhone" required placeholder="Emergency Phone Number" class="px-4 py-2.5 rounded-xl border border-amber-200 focus:outline-none focus:border-amber-500 bg-white text-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 2: Child Details -->
+                <div id="step2" class="step-content hidden space-y-5">
+                    <div class="border-b border-gray-100 pb-3 flex justify-between items-end">
+                        <div>
+                            <h2 class="text-2xl font-bold text-craftRose flex items-center gap-2">
+                                <i class="fa-solid fa-shapes text-craftPurple"></i> Little Crafters Info
+                            </h2>
+                            <p class="text-sm text-gray-500">You can add multiple children aged 5 to 10 in one single booking!</p>
+                        </div>
+                    </div>
+
+                    <div id="childrenContainer" class="space-y-4">
+                        <!-- Dynamic Child Cards insertion -->
+                    </div>
+
+                    <button type="button" onclick="addChildCard()" class="w-full py-3 border-2 border-dashed border-craftPurple text-craftPurple font-bold rounded-2xl hover:bg-purple-50 transition-colors flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-circle-plus text-lg"></i> Add Another Child (£10 / child)
+                    </button>
+                </div>
+
+                <!-- STEP 3: Session Selection -->
+                <div id="step3" class="step-content hidden space-y-5">
+                    <div class="border-b border-gray-100 pb-3">
+                        <h2 class="text-2xl font-bold text-craftPurple flex items-center gap-2">
+                            <i class="fa-solid fa-palette text-craftBlue"></i> Choose Session & Time
+                        </h2>
+                        <p class="text-sm text-gray-500">Pick a creative workshop activity and an available time slot.</p>
+                    </div>
+
+                    <!-- Workshop Theme Selector -->
+                    <div>
+                        <label class="block text-xs font-bold text-gray-700 uppercase mb-2">Select Workshop Theme</label>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="themeGrid">
+                            <!-- Theme Options -->
+                        </div>
+                    </div>
+
+                    <!-- Date & Time Slot Selector -->
+                    <div id="timeSlotsSection" class="pt-4 border-t border-gray-100">
+                        <div class="flex justify-between items-center mb-3">
+                            <label class="block text-xs font-bold text-gray-700 uppercase">Available 1-Hour Time Slots</label>
+                            <span class="text-xs font-semibold text-craftPurple bg-purple-100 px-3 py-1 rounded-full" id="selectedThemeLabel">Pottery Magic</span>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3" id="slotsContainer">
+                            <!-- Time Slot Cards filled by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- STEP 4: Safety Check & Review -->
+                <div id="step4" class="step-content hidden space-y-5">
+                    <div class="border-b border-gray-100 pb-3">
+                        <h2 class="text-2xl font-bold text-craftGreen flex items-center gap-2">
+                            <i class="fa-solid fa-clipboard-check text-craftGreen"></i> Safety Consent & Order Review
+                        </h2>
+                        <p class="text-sm text-gray-500">Please review your booking details and confirm permissions.</p>
+                    </div>
+
+                    <!-- Live Summary Card -->
+                    <div class="bg-purple-50/70 border-2 border-purple-200 rounded-2xl p-5 space-y-3">
+                        <h3 class="font-bold text-craftPurple text-lg border-b border-purple-200 pb-2 flex justify-between items-center">
+                            <span>Summary</span>
+                            <span id="summaryTotalBadge" class="text-xl font-bold text-craftRose">£10</span>
+                        </h3>
+                        
+                        <div class="text-sm space-y-2">
+                            <div class="flex justify-between text-gray-600">
+                                <span>Adult Contact:</span>
+                                <span class="font-bold text-gray-800" id="summaryAdult">-</span>
+                            </div>
+                            <div class="flex justify-between text-gray-600">
+                                <span>Children Attending:</span>
+                                <span class="font-bold text-gray-800" id="summaryChildren">-</span>
+                            </div>
+                            <div class="flex justify-between text-gray-600">
+                                <span>Workshop Session:</span>
+                                <span class="font-bold text-gray-800" id="summarySession">-</span>
+                            </div>
+                            <div class="flex justify-between text-gray-600">
+                                <span>Time Slot:</span>
+                                <span class="font-bold text-gray-800" id="summaryTime">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Consent Checks -->
+                    <div class="space-y-3 pt-2">
+                        <label class="flex items-start gap-3 p-3 rounded-2xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors">
+                            <input type="checkbox" id="photoConsent" class="mt-1 w-5 h-5 rounded border-gray-300 text-craftPurple focus:ring-craftPurple">
+                            <span class="text-xs text-gray-600">
+                                <strong class="text-gray-800 block text-sm">Photography & Media Consent (Optional)</strong>
+                                I allow Little Crafters Workshop to take photos of craft projects and activities for social media or promotional material.
+                            </span>
+                        </label>
+
+                        <label class="flex items-start gap-3 p-3 rounded-2xl border border-gray-200 hover:bg-gray-50 cursor-pointer transition-colors">
+                            <input type="checkbox" id="termsConsent" required class="mt-1 w-5 h-5 rounded border-gray-300 text-craftPurple focus:ring-craftPurple">
+                            <span class="text-xs text-gray-600">
+                                <strong class="text-gray-800 block text-sm">Terms & Safety Agreement *</strong>
+                                I confirm children are between 5-10 years old, will be accompanied or dropped off according to studio guidelines, and all listed health/allergy requirements are accurate.
+                            </span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- Navigation Controls -->
+                <div class="flex justify-between items-center pt-6 border-t border-gray-100 mt-6">
+                    <button type="button" id="prevBtn" onclick="changeStep(-1)" class="px-6 py-3 rounded-2xl font-bold border-2 border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors hidden">
+                        <i class="fa-solid fa-arrow-left mr-2"></i> Back
+                    </button>
+
+                    <div class="ml-auto flex items-center gap-3">
+                        <button type="button" id="nextBtn" onclick="changeStep(1)" class="craft-btn bg-craftPurple hover:bg-purple-700 text-white font-bold px-8 py-3.5 rounded-2xl text-base shadow-lg shadow-purple-200 flex items-center gap-2">
+                            Next Step <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+
+                        <button type="button" id="confirmBtn" onclick="processBooking()" class="craft-btn bg-gradient-to-r from-craftRose to-craftPink text-white font-bold px-8 py-3.5 rounded-2xl text-base shadow-lg shadow-pink-200 hidden flex items-center gap-2">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i> Confirm Booking
+                        </button>
+                    </div>
+                </div>
+
+            </form>
+        </div>
+    </main>
+
+    <!-- Confirmation Modal / Ticket Pass Modal -->
+    <div id="ticketModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden overflow-y-auto">
+        <div class="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl border-4 border-craftYellow my-8 transform transition-all">
+            
+            <div id="printableTicket" class="p-6 md:p-8 bg-gradient-to-b from-purple-50 via-white to-pink-50 relative">
+                <!-- Decorative Top Edge -->
+                <div class="flex justify-between items-center border-b-2 border-dashed border-gray-300 pb-4 mb-4">
+                    <div class="flex items-center gap-2">
+                        <div class="w-10 h-10 bg-craftPurple text-white rounded-xl flex items-center justify-center font-bold text-xl">
+                            <i class="fa-solid fa-ticket"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs uppercase font-bold tracking-widest text-craftRose">Official Workshop Pass</span>
+                            <h3 class="font-bold text-xl text-gray-800 leading-tight">Little Crafters Ticket</h3>
+                        </div>
+                    </div>
+                    <span id="ticketRef" class="bg-purple-100 text-craftPurple text-xs font-mono font-bold px-3 py-1.5 rounded-lg border border-purple-200">#LCW-8821</span>
+                </div>
+
+                <!-- Ticket Core Details -->
+                <div class="space-y-4">
+                    <div class="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-2">
+                        <div class="text-xs text-gray-400 font-bold uppercase">Workshop Session</div>
+                        <div class="text-lg font-bold text-craftPurple" id="ticketSessionTitle">Slime & Sparkles Lab</div>
+                        <div class="flex items-center gap-2 text-xs text-gray-600 font-semibold">
+                            <i class="fa-regular fa-calendar text-craftRose"></i> <span id="ticketTime">Saturday, 10:00 AM - 11:00 AM</span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-3 text-sm">
+                        <div class="bg-white p-3 rounded-xl border border-gray-100">
+                            <div class="text-[10px] text-gray-400 font-bold uppercase">Guardian</div>
+                            <div class="font-bold text-gray-800 truncate" id="ticketGuardianName">Sarah Jenkins</div>
+                        </div>
+                        <div class="bg-white p-3 rounded-xl border border-gray-100">
+                            <div class="text-[10px] text-gray-400 font-bold uppercase">Total Paid</div>
+                            <div class="font-bold text-craftRose" id="ticketCost">£10.00</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-3 rounded-xl border border-gray-100">
+                        <div class="text-[10px] text-gray-400 font-bold uppercase mb-1">Young Artist(s) Attending</div>
+                        <div id="ticketChildrenList" class="flex flex-wrap gap-1.5">
+                            <!-- Badges of kids -->
+                        </div>
+                    </div>
+
+                    <!-- QR Code & Verification -->
+                    <div class="flex items-center justify-between bg-purple-900 text-white p-4 rounded-2xl">
+                        <div>
+                            <div class="text-xs text-purple-200 font-medium">Scan upon arrival</div>
+                            <div class="text-xs font-bold text-craftYellow mt-1"><i class="fa-solid fa-location-dot"></i> Studio 4, Craft Alley</div>
+                            <div class="text-[10px] text-purple-300">All materials provided</div>
+                        </div>
+                        <div class="bg-white p-1.5 rounded-xl shadow">
+                            <div id="qrcode"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Printable Footer Note -->
+                <p class="text-[11px] text-center text-gray-400 mt-4">Please arrive 5 minutes before session time. We recommend wearing art-friendly clothes!</p>
+            </div>
+
+            <!-- Modal Actions -->
+            <div class="bg-gray-50 p-4 border-t border-gray-200 flex flex-wrap gap-2 justify-end no-print">
+                <button onclick="addToCalendar()" class="bg-white hover:bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-xs font-bold border border-gray-300 flex items-center gap-1.5">
+                    <i class="fa-regular fa-calendar-plus text-craftPurple"></i> Calendar
+                </button>
+                <button onclick="window.print()" class="bg-craftBlue hover:bg-teal-400 text-teal-950 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors">
+                    <i class="fa-solid fa-print"></i> Print Ticket
+                </button>
+                <button onclick="closeTicketModal()" class="bg-craftPurple hover:bg-purple-800 text-white px-5 py-2 rounded-xl text-xs font-bold transition-colors">
+                    Done
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- My Bookings Modal -->
+    <div id="myBookingsModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+        <div class="bg-white w-full max-w-2xl rounded-3xl shadow-2xl p-6 border-4 border-craftBlue max-h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center border-b border-gray-100 pb-3 mb-4">
+                <h3 class="text-2xl font-bold text-craftPurple flex items-center gap-2">
+                    <i class="fa-solid fa-box-archive text-craftBlue"></i> My Saved Bookings
+                </h3>
+                <button onclick="toggleMyBookingsModal()" class="text-gray-400 hover:text-gray-600 text-xl font-bold">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div id="bookingsListContainer" class="flex-1 overflow-y-auto space-y-3 pr-1">
+                <!-- Bookings rendered here -->
+            </div>
+
+            <div class="pt-4 border-t border-gray-100 mt-4 flex justify-between items-center">
+                <button onclick="clearAllBookings()" class="text-xs text-red-500 font-semibold hover:underline">Clear History</button>
+                <button onclick="toggleMyBookingsModal()" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-5 py-2 rounded-xl text-sm font-bold">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification Container -->
+    <div id="toast" class="fixed bottom-5 right-5 bg-gray-900 text-white px-5 py-3 rounded-2xl shadow-xl flex items-center gap-3 z-50 transform translate-y-20 opacity-0 transition-all duration-300">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-craftGreen text-xl"></i>
+        <span id="toastMsg" class="text-sm font-semibold">Notification message</span>
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // Data Definitions
+        const WORKSHOP_THEMES = [
+            {
+                id: 'slime',
+                title: 'Slime & Sparkles Lab',
+                icon: 'fa-vial-circle-check',
+                color: 'from-pink-500 to-rose-400',
+                desc: 'Fluffy slime, glitter swirls & sensory charms.',
+                price: 10
+            },
+            {
+                id: 'pottery',
+                title: 'Pottery & Clay Monsters',
+                icon: 'fa-cube',
+                color: 'from-purple-500 to-indigo-400',
+                desc: 'Air-dry clay sculpting, painting & embellishing.',
+                price: 10
+            },
+            {
+                id: 'papercraft',
+                title: 'Papercraft Magic & Origami',
+                icon: 'fa-wand-magic-sparkles',
+                color: 'from-amber-400 to-orange-400',
+                desc: '3D pop-up cards, paper lanterns & crown making.',
+                price: 10
+            },
+            {
+                id: 'painting',
+                title: 'Canvas & Splash Painting',
+                icon: 'fa-palette',
+                color: 'from-teal-400 to-cyan-500',
+                desc: 'Mini canvas masterpieces using child-safe acrylics.',
+                price: 10
+            }
+        ];
+
+        const TIME_SLOTS = [
+            { id: 'slot-1', day: 'Saturday', time: '10:00 AM - 11:00 AM', capacity: 3 },
+            { id: 'slot-2', day: 'Saturday', time: '11:30 AM - 12:30 PM', capacity: 6 },
+            { id: 'slot-3', day: 'Saturday', time: '02:00 PM - 03:00 PM', capacity: 2 },
+            { id: 'slot-4', day: 'Sunday', time: '10:00 AM - 11:00 AM', capacity: 8 },
+            { id: 'slot-5', day: 'Sunday', time: '01:00 PM - 02:00 PM', capacity: 5 },
+            { id: 'slot-6', day: 'Wednesday (After-School)', time: '04:00 PM - 05:00 PM', capacity: 4 }
+        ];
+
+        // State variables
+        let currentStep = 1;
+        let childCount = 0;
+        let selectedTheme = WORKSHOP_THEMES[0].id;
+        let selectedSlot = TIME_SLOTS[0].id;
+        let qrcodeObj = null;
+
+        // Initialization
+        window.onload = function() {
+            renderThemes();
+            renderTimeSlots();
+            addChildCard(); // Add initial child card
+            updateBookingsBadge();
+        };
+
+        // Render Themes UI
+        function renderThemes() {
+            const grid = document.getElementById('themeGrid');
+            grid.innerHTML = WORKSHOP_THEMES.map(theme => `
+                <div onclick="selectTheme('${theme.id}')" id="theme-card-${theme.id}" class="theme-card border-2 ${selectedTheme === theme.id ? 'border-craftPurple bg-purple-50/50 shadow-md' : 'border-gray-200'} rounded-2xl p-4 cursor-pointer hover:border-craftPurple transition-all flex items-start gap-3">
+                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br ${theme.color} text-white flex items-center justify-center text-xl shrink-0 shadow">
+                        <i class="fa-solid ${theme.icon}"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <h4 class="font-bold text-gray-800 text-base">${theme.title}</h4>
+                        </div>
+                        <p class="text-xs text-gray-500 mt-1">${theme.desc}</p>
+                        <span class="inline-block text-[11px] font-bold text-craftPurple bg-purple-100 px-2 py-0.5 rounded-md mt-2">£10 / Child</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function selectTheme(themeId) {
+            selectedTheme = themeId;
+            renderThemes();
+            const themeObj = WORKSHOP_THEMES.find(t => t.id === themeId);
+            document.getElementById('selectedThemeLabel').innerText = themeObj.title;
+        }
+
+        // Render Time Slots UI
+        function renderTimeSlots() {
+            const container = document.getElementById('slotsContainer');
+            container.innerHTML = TIME_SLOTS.map(slot => {
+                const isSelected = selectedSlot === slot.id;
+                const isLow = slot.capacity <= 3;
+                return `
+                    <div onclick="selectSlot('${slot.id}')" id="slot-card-${slot.id}" class="border-2 ${isSelected ? 'border-craftRose bg-pink-50/60' : 'border-gray-200'} rounded-2xl p-3 cursor-pointer hover:border-craftRose transition-all">
+                        <div class="text-xs font-bold text-gray-400 uppercase">${slot.day}</div>
+                        <div class="font-bold text-gray-800 text-sm mt-0.5">${slot.time}</div>
+                        <div class="flex items-center justify-between mt-3 pt-2 border-t border-gray-100">
+                            <span class="text-[11px] font-bold ${isLow ? 'text-amber-600 bg-amber-50' : 'text-craftGreen bg-green-50'} px-2 py-0.5 rounded-md flex items-center gap-1">
+                                <i class="fa-solid fa-users text-[10px]"></i> ${slot.capacity} spots left
+                            </span>
+                            ${isSelected ? '<i class="fa-solid fa-circle-check text-craftRose text-base"></i>' : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function selectSlot(slotId) {
+            selectedSlot = slotId;
+            renderTimeSlots();
+        }
+
+        // Dynamic Child Cards Management
+        function addChildCard() {
+            childCount++;
+            const container = document.getElementById('childrenContainer');
+            const cardId = `child-card-${childCount}`;
+
+            const cardHtml = `
+                <div id="${cardId}" class="child-item bg-white border-2 border-gray-200 rounded-2xl p-4 relative space-y-3 transition-all">
+                    <div class="flex justify-between items-center border-b border-gray-100 pb-2">
+                        <span class="font-bold text-craftPurple text-sm flex items-center gap-2">
+                            <i class="fa-solid fa-child-reaching text-craftRose"></i> Child #${childCount}
+                        </span>
+                        ${childCount > 1 ? `
+                            <button type="button" onclick="removeChildCard('${cardId}')" class="text-xs text-red-400 hover:text-red-600 font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-trash-can"></i> Remove
+                            </button>
+                        ` : ''}
+                    </div>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="sm:col-span-2">
+                            <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1">Child's Full Name *</label>
+                            <input type="text" class="child-name w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-craftPurple" required placeholder="e.g. Leo Smith">
+                        </div>
+
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1">Age (5-10) *</label>
+                            <select class="child-age w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-craftPurple bg-white" required>
+                                <option value="5">5 Years Old</option>
+                                <option value="6">6 Years Old</option>
+                                <option value="7">7 Years Old</option>
+                                <option value="8">8 Years Old</option>
+                                <option value="9">9 Years Old</option>
+                                <option value="10">10 Years Old</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1">Medical Info / Allergies / Special Requirements</label>
+                        <input type="text" class="child-medical w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-craftPurple" placeholder="e.g. Peanut allergy, sensitive skin, none">
+                    </div>
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', cardHtml);
+        }
+
+        function removeChildCard(cardId) {
+            const el = document.getElementById(cardId);
+            if (el) {
+                el.remove();
+                renumberChildren();
+            }
+        }
+
+        function renumberChildren() {
+            const cards = document.querySelectorAll('.child-item');
+            cards.forEach((card, index) => {
+                const label = card.querySelector('.flex.justify-between span');
+                if (label) {
+                    label.innerHTML = `<i class="fa-solid fa-child-reaching text-craftRose"></i> Child #${index + 1}`;
+                }
+            });
+            childCount = cards.length;
+        }
+
+        // Multi-step Navigation
+        function goToStep(step) {
+            if (step > currentStep && !validateCurrentStep()) {
+                return;
+            }
+            currentStep = step;
+            updateStepVisibility();
+        }
+
+        function changeStep(delta) {
+            if (delta > 0 && !validateCurrentStep()) {
+                return;
+            }
+            currentStep += delta;
+            updateStepVisibility();
+        }
+
+        function validateCurrentStep() {
+            if (currentStep === 1) {
+                const name = document.getElementById('parentName').value.trim();
+                const email = document.getElementById('parentEmail').value.trim();
+                const phone = document.getElementById('parentPhone').value.trim();
+                const emName = document.getElementById('emergencyName').value.trim();
+                const emPhone = document.getElementById('emergencyPhone').value.trim();
+
+                if (!name || !email || !phone || !emName || !emPhone) {
+                    showToast('Please fill in all required parent & emergency fields.', 'error');
+                    return false;
+                }
+            } else if (currentStep === 2) {
+                const names = document.querySelectorAll('.child-name');
+                let valid = true;
+                names.forEach(input => {
+                    if (!input.value.trim()) {
+                        valid = false;
+                    }
+                });
+
+                if (!valid || names.length === 0) {
+                    showToast('Please enter names for all attending children.', 'error');
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        function updateStepVisibility() {
+            // Hide all step views
+            document.querySelectorAll('.step-content').forEach(el => el.classList.add('hidden'));
+            
+            // Show current active step
+            document.getElementById(`step${currentStep}`).classList.remove('hidden');
+
+            // Update Wizard header pills
+            const pills = document.querySelectorAll('.step-pill');
+            pills.forEach((pill, idx) => {
+                if (idx + 1 === currentStep) {
+                    pill.className = 'step-pill active px-4 py-2 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap cursor-pointer';
+                } else {
+                    pill.className = 'step-pill px-4 py-2 bg-gray-100 text-gray-500 rounded-2xl text-xs sm:text-sm font-bold flex items-center gap-2 whitespace-nowrap cursor-pointer';
+                }
+            });
+
+            // Progress bar width
+            const progressBar = document.getElementById('progressBar');
+            progressBar.style.width = `${(currentStep / 4) * 100}%`;
+
+            // Buttons controls
+            const prevBtn = document.getElementById('prevBtn');
+            const nextBtn = document.getElementById('nextBtn');
+            const confirmBtn = document.getElementById('confirmBtn');
+
+            if (currentStep === 1) {
+                prevBtn.classList.add('hidden');
+            } else {
+                prevBtn.classList.remove('hidden');
+            }
+
+            if (currentStep === 4) {
+                nextBtn.classList.add('hidden');
+                confirmBtn.classList.remove('hidden');
+                updateReviewSummary();
+            } else {
+                nextBtn.classList.remove('hidden');
+                confirmBtn.classList.add('hidden');
+            }
+        }
+
+        // Live Review Summary Update
+        function updateReviewSummary() {
+            const parentName = document.getElementById('parentName').value.trim();
+            const childrenCards = document.querySelectorAll('.child-item');
+            const totalKids = childrenCards.length;
+            const totalPrice = totalKids * 10;
+
+            const themeObj = WORKSHOP_THEMES.find(t => t.id === selectedTheme);
+            const slotObj = TIME_SLOTS.find(s => s.id === selectedSlot);
+
+            document.getElementById('summaryAdult').innerText = parentName || '-';
+            document.getElementById('summaryChildren').innerText = `${totalKids} Child (${totalKids * 10} £)`;
+            document.getElementById('summarySession').innerText = themeObj ? themeObj.title : '-';
+            document.getElementById('summaryTime').innerText = slotObj ? `${slotObj.day}, ${slotObj.time}` : '-';
+            document.getElementById('summaryTotalBadge').innerText = `£${totalPrice}`;
+        }
+
+        // Process Final Booking
+        function processBooking() {
+            const termsChecked = document.getElementById('termsConsent').checked;
+            if (!termsChecked) {
+                showToast('Please accept the Terms & Safety Agreement to proceed.', 'error');
+                return;
+            }
+
+            // Gather all booking data
+            const childrenData = [];
+            document.querySelectorAll('.child-item').forEach(card => {
+                childrenData.push({
+                    name: card.querySelector('.child-name').value.trim(),
+                    age: card.querySelector('.child-age').value,
+                    medical: card.querySelector('.child-medical').value.trim() || 'None'
+                });
+            });
+
+            const parentName = document.getElementById('parentName').value.trim();
+            const parentEmail = document.getElementById('parentEmail').value.trim();
+            const parentPhone = document.getElementById('parentPhone').value.trim();
+            const themeObj = WORKSHOP_THEMES.find(t => t.id === selectedTheme);
+            const slotObj = TIME_SLOTS.find(s => s.id === selectedSlot);
+            const refCode = 'LCW-' + Math.floor(1000 + Math.random() * 9000);
+            const totalCost = childrenData.length * 10;
+
+            const bookingRecord = {
+                refCode,
+                parentName,
+                parentEmail,
+                parentPhone,
+                themeTitle: themeObj.title,
+                slotDay: slotObj.day,
+                slotTime: slotObj.time,
+                children: childrenData,
+                totalCost,
+                timestamp: new Date().toISOString()
+            };
+
+            // Save to LocalStorage
+            saveBookingToStorage(bookingRecord);
+
+            // Populate Printable Digital Ticket
+            document.getElementById('ticketRef').innerText = `#${refCode}`;
+            document.getElementById('ticketSessionTitle').innerText = themeObj.title;
+            document.getElementById('ticketTime').innerText = `${slotObj.day}, ${slotObj.time}`;
+            document.getElementById('ticketGuardianName').innerText = parentName;
+            document.getElementById('ticketCost').innerText = `£${totalCost}.00`;
+
+            const kidsListEl = document.getElementById('ticketChildrenList');
+            kidsListEl.innerHTML = childrenData.map(k => `
+                <span class="bg-purple-100 text-craftPurple text-xs font-bold px-2.5 py-1 rounded-lg flex items-center gap-1">
+                    <i class="fa-solid fa-face-smile text-craftRose"></i> ${k.name} (${k.age} yrs)
+                </span>
+            `).join('');
+
+            // Generate QR Code
+            generateQRCode(refCode);
+
+            // Confetti Trigger
+            confetti({
+                particleCount: 120,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+
+            // Open Modal
+            document.getElementById('ticketModal').classList.remove('hidden');
+            showToast('Booking Successful! 🎉', 'success');
+        }
+
+        // QR Code Generation Helper
+        function generateQRCode(text) {
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = '';
+            qrcodeObj = new QRCode(qrContainer, {
+                text: text,
+                width: 64,
+                height: 64,
+                colorDark : "#4C1D95",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+        }
+
+        // Local Storage Helper Functions
+        function saveBookingToStorage(record) {
+            const existing = JSON.parse(localStorage.getItem('lcw_bookings') || '[]');
+            existing.push(record);
+            localStorage.setItem('lcw_bookings', JSON.stringify(existing));
+            updateBookingsBadge();
+        }
+
+        function getStoredBookings() {
+            return JSON.parse(localStorage.getItem('lcw_bookings') || '[]');
+        }
+
+        function updateBookingsBadge() {
+            const count = getStoredBookings().length;
+            document.getElementById('bookingCountBadge').innerText = count;
+        }
+
+        // My Bookings Modal Logic
+        function toggleMyBookingsModal() {
+            const modal = document.getElementById('myBookingsModal');
+            if (modal.classList.contains('hidden')) {
+                renderSavedBookings();
+                modal.classList.remove('hidden');
+            } else {
+                modal.classList.add('hidden');
+            }
+        }
+
+        function renderSavedBookings() {
+            const list = getStoredBookings();
+            const container = document.getElementById('bookingsListContainer');
+
+            if (list.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-gray-400 space-y-2">
+                        <i class="fa-solid fa-ticket-simple text-4xl text-gray-300"></i>
+                        <p class="text-sm font-semibold">No bookings found yet.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = list.map(b => `
+                <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="font-bold text-gray-800 text-sm">${b.themeTitle}</span>
+                            <span class="text-[10px] font-mono font-bold bg-purple-100 text-craftPurple px-2 py-0.5 rounded">#${b.refCode}</span>
+                        </div>
+                        <div class="text-xs text-gray-500 mt-1">
+                            <i class="fa-regular fa-calendar"></i> ${b.slotDay}, ${b.slotTime}
+                        </div>
+                        <div class="text-xs text-gray-600 mt-0.5 font-semibold">
+                            Kids: ${b.children.map(c => c.name).join(', ')}
+                        </div>
+                    </div>
+                    <div class="text-right flex items-center gap-3 self-end sm:self-center">
+                        <span class="font-bold text-craftRose text-base">£${b.totalCost}</span>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function clearAllBookings() {
+            if (confirm('Are you sure you want to clear your saved booking history?')) {
+                localStorage.removeItem('lcw_bookings');
+                renderSavedBookings();
+                updateBookingsBadge();
+                showToast('Booking history cleared.', 'info');
+            }
+        }
+
+        function closeTicketModal() {
+            document.getElementById('ticketModal').classList.add('hidden');
+        }
+
+        function addToCalendar() {
+            showToast('Calendar event file downloaded! 📅', 'success');
+        }
+
+        // Toast Notification System
+        function showToast(msg, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.innerText = msg;
+
+            if (type === 'error') {
+                toastIcon.className = 'fa-solid fa-triangle-exclamation text-amber-400 text-xl';
+            } else if (type === 'success') {
+                toastIcon.className = 'fa-solid fa-circle-check text-craftGreen text-xl';
+            } else {
+                toastIcon.className = 'fa-solid fa-circle-info text-craftBlue text-xl';
+            }
+
+            toast.classList.remove('translate-y-20', 'opacity-0');
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
